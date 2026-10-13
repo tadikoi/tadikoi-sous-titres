@@ -1,0 +1,20 @@
+{
+  "package_id": "fr.tadikoi.soustitres",
+  "edition": "202601",
+  "name": "TADIKOI Sous-titres",
+  "version": "0.1.0",
+  "min_sdk_version": "0.0.16",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "g2-microphone",
+      "desc": "Capte la voix des interlocuteurs pour l'afficher en sous-titres sur les lunettes. L'audio est traité uniquement sur le téléphone, rien n'est envoyé sur internet."
+    },
+    {
+      "name": "network",
+      "desc": "Sert uniquement à télécharger une fois les packs de langue. Ensuite la transcription fonctionne sans internet.",
+      "whitelist": ["https://tadikoi.github.io"]
+    }
+  ],
+  "supported_languages": ["fr", "en"]
+}

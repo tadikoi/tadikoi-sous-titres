@@ -1,0 +1,19 @@
+{
+  "name": "tadikoi-sous-titres",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "pack": "npm run build && evenhub pack app.json dist -o tadikoi-sous-titres.ehpk --sdk-ver 0.0.16"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "0.0.16",
+    "vosk-browser": "^0.0.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0"
+  }
+}
