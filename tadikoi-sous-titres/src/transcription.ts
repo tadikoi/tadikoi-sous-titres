@@ -55,6 +55,11 @@ export class Transcripteur {
     this.reco.acceptWaveformFloat(flottants, FREQUENCE)
   }
 
+  /** Audio déjà au format 16 kHz en nombres décimaux (micro du téléphone, mode test). */
+  envoyerFloat(echantillons: Float32Array): void {
+    this.reco?.acceptWaveformFloat(echantillons, FREQUENCE)
+  }
+
   liberer(): void {
     try { this.reco?.remove() } catch { /* déjà libéré */ }
     try { this.modele?.terminate() } catch { /* déjà libéré */ }

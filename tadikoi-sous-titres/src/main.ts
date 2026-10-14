@@ -3,15 +3,38 @@ import {
   waitForEvenAppBridge,
   AudioInputSource,
   OsEventTypeList,
+  type EvenAppBridge,
 } from '@evenrealities/even_hub_sdk'
 import { LANGUES, type Langue, estInstallee, supprimer, demanderStockagePersistant, espaceUtilise } from './langues'
 import { Transcripteur, telecharger } from './transcription'
 import { EcranLunettes } from './lunettes'
+import { EcranTelephone, MicroTelephone, stockageLocal, type Affichage } from './navigateur'
 
 const CLE_LANGUE = 'langue_active'
 
-const bridge = await waitForEvenAppBridge()
-const ecran = new EcranLunettes(bridge)
+// Dans l'app Even (et le simulateur), la page est hébergée par une webview Flutter
+// qui expose window.flutter_inappwebview. Dans un navigateur ordinaire, cet objet
+// n'existe pas : on passe alors en mode test (micro et écran du téléphone).
+async function dansAppEven(): Promise<boolean> {
+  for (let i = 0; i < 15; i++) {
+    if ('flutter_inappwebview' in window) return true
+    await new Promise((r) => setTimeout(r, 100))
+  }
+  return false
+}
+const bridge: EvenAppBridge | null = (await dansAppEven()) ? await waitForEvenAppBridge() : null
+const modeTest = bridge === null
+const micro = new MicroTelephone()
+let ecran: Affichage
+if (bridge) {
+  const lunettes = new EcranLunettes(bridge)
+  await lunettes.creer('TADIKOI Sous-titres\n\nPréparation…')
+  ecran = lunettes
+} else {
+  ecran = new EcranTelephone()
+}
+const lireStockage = (cle: string) => (bridge ? bridge.getLocalStorage(cle) : stockageLocal.get(cle))
+const ecrireStockage = (cle: string, v: string) => (bridge ? bridge.setLocalStorage(cle, v) : stockageLocal.set(cle, v))
 const transcripteur = new Transcripteur()
 
 let enCours = false
@@ -20,9 +43,7 @@ const enTelechargement = new Set<string>()
 
 // ---------- Lunettes ----------
 
-await ecran.creer('TADIKOI Sous-titres\n\nPréparation…')
-
-bridge.onEvenHubEvent((event) => {
+bridge?.onEvenHubEvent((event) => {
   if (event.audioEvent?.audioPcm && enCours) {
     transcripteur.envoyerAudio(event.audioEvent.audioPcm)
     return
@@ -35,7 +56,7 @@ bridge.onEvenHubEvent((event) => {
       void (enCours ? arreter() : demarrer())
       break
     case OsEventTypeList.DOUBLE_CLICK_EVENT:
-      void arreter().then(() => bridge.shutDownPageContainer(1))
+      void arreter().then(() => bridge?.shutDownPageContainer(1))
       break
   }
 })
@@ -57,20 +78,31 @@ async function demarrer(): Promise<void> {
     afficherEtat(`Erreur de chargement : ${String(e)}`)
     return
   }
-  const ok = await bridge.audioControl(true, AudioInputSource.Glasses)
-  if (!ok) {
-    ecran.message('Micro des lunettes\nindisponible.')
-    return
+  if (bridge) {
+    const ok = await bridge.audioControl(true, AudioInputSource.Glasses)
+    if (!ok) {
+      ecran.message('Micro des lunettes\nindisponible.')
+      return
+    }
+  } else {
+    try {
+      await micro.demarrer((echantillons) => { if (enCours) transcripteur.envoyerFloat(echantillons) })
+    } catch (e) {
+      ecran.message('Micro du téléphone refusé.\nAutorisez le micro pour ce site dans Chrome.')
+      afficherEtat(`Micro indisponible : ${String(e)}`)
+      return
+    }
   }
   enCours = true
-  ecran.message(`● ${langueActive.nom} — à l'écoute\n(toucher pour arrêter)`)
+  ecran.message(modeTest ? `● ${langueActive.nom} — parlez, les sous-titres s'affichent ici` : `● ${langueActive.nom} — à l'écoute\n(toucher pour arrêter)`)
   majInterface()
 }
 
 async function arreter(): Promise<void> {
   if (!enCours) return
   enCours = false
-  await bridge.audioControl(false)
+  if (bridge) await bridge.audioControl(false)
+  else micro.arreter()
   ecran.message(`En pause — ${langueActive.nom}\n\nToucher : reprendre\nDouble toucher : quitter`)
   majInterface()
 }
@@ -127,7 +159,7 @@ async function majInterface(): Promise<void> {
 
 async function choisir(l: Langue): Promise<void> {
   langueActive = l
-  await bridge.setLocalStorage(CLE_LANGUE, l.code)
+  await ecrireStockage(CLE_LANGUE, l.code)
   ecran.message(`Langue : ${l.nom}\n\nToucher pour démarrer`)
   void majInterface()
 }
@@ -162,7 +194,7 @@ async function retirer(l: Langue): Promise<void> {
 // ---------- Démarrage ----------
 
 const persistant = await demanderStockagePersistant()
-const codeSauve = await bridge.getLocalStorage(CLE_LANGUE)
+const codeSauve = await lireStockage(CLE_LANGUE)
 langueActive = LANGUES.find((l) => l.code === codeSauve) ?? LANGUES[0]
 
 if (await estInstallee(langueActive)) {
