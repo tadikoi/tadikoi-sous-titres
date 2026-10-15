@@ -69,7 +69,8 @@ export class MicroTelephone {
 
   async demarrer(surAudio: (echantillons: Float32Array) => void): Promise<void> {
     this.flux = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+      // Filtres de Chrome activés (anti-bruit, anti-écho, volume automatique).
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
     })
     // Chrome rééchantillonne lui-même le micro à 16 kHz.
     this.contexte = new AudioContext({ sampleRate: 16000 })
